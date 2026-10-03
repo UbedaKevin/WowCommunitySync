@@ -1,4 +1,7 @@
 import unittest
+from unittest.mock import Mock, patch
+from services.api_service import ApiService
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 
@@ -109,6 +112,73 @@ class TestApiService(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    @patch("services.api_service.requests.get")
+    def test_get_character_events(
+        self,
+        mock_get
+    ):
+        mock_response = Mock()
+
+        mock_response.json.return_value = {
+            "status": "ok",
+            "events": [
+                {
+                    "id": 12,
+                    "event_type": "LEVEL_UP",
+                    "event_data": {
+                        "oldLevel": 6,
+                        "newLevel": 7,
+                    },
+                }
+            ],
+            "pagination": {
+                "limit": 20,
+                "offset": 0,
+                "hasMore": False,
+                "total": 1,
+            },
+        }
+
+        mock_response.raise_for_status.return_value = None
+
+        mock_get.return_value = mock_response
+
+        api_service = ApiService(
+            "http://localhost:3000",
+            "test-token"
+        )
+
+        response = api_service.get_character_events(
+            4
+        )
+
+        self.assertEqual(
+            response["status"],
+            "ok"
+        )
+
+        self.assertEqual(
+            len(response["events"]),
+            1
+        )
+
+        self.assertEqual(
+            response["events"][0]["event_type"],
+            "LEVEL_UP"
+        )
+
+        mock_get.assert_called_once_with(
+            "http://localhost:3000/api/characters/4/events",
+            headers={
+                "Authorization": "Bearer test-token"
+            },
+            params={
+                "limit": 20,
+                "offset": 0,
+            },
+            timeout=10
+        )
             
 if __name__ == "__main__":
     unittest.main()

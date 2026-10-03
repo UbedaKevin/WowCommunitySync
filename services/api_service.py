@@ -48,3 +48,52 @@ class ApiService:
                 "L'API a retourné une réponse JSON invalide."
             ) from error
 
+    def get_character_events(
+        self,
+        character_id,
+        limit=20,
+        offset=0
+    ):
+        url = (
+            f"{self.base_url}/api/characters/"
+            f"{character_id}/events"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {self.access_token}"
+        }
+
+        params = {
+            "limit": limit,
+            "offset": offset,
+        }
+
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                params=params,
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+        except requests.HTTPError as error:
+            status_code = error.response.status_code
+
+            raise ApiServiceError(
+                f"L'API a retourné une erreur HTTP {status_code}."
+            ) from error
+
+        except requests.RequestException as error:
+            raise ApiServiceError(
+                f"Erreur réseau lors de la communication avec l'API : {error}"
+            ) from error
+
+        try:
+            return response.json()
+
+        except ValueError as error:
+            raise ApiServiceError(
+                "L'API a retourné une réponse JSON invalide."
+            ) from error

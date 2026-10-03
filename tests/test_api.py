@@ -25,17 +25,17 @@ def main():
         print("SavedVariables introuvable.")
         return
 
-    print(
-        f"SavedVariables trouvé :\n{file_path}\n"
-    )
+    # print(
+    #     f"SavedVariables trouvé :\n{file_path}\n"
+    # )
 
     data = load_characters(
         file_path
     )
     
-    print("Clés trouvées dans SavedVariables :")
-    for key in data:
-        print("-", key)
+    # print("Clés trouvées dans SavedVariables :")
+    # for key in data:
+    #     print("-", key)
 
     character_service = CharacterService()
 
@@ -43,14 +43,14 @@ def main():
         data
     )
 
-    print("Personnages trouvés :", len(characters))
+    # print("Personnages trouvés :", len(characters))
 
-    for character in characters:
-        print(
-            character.key,
-            "->",
-            character.name
-        )
+    # for character in characters:
+    #     print(
+    #         character.key,
+    #         "->",
+    #         character.name
+    #     )
 
     payload = character_service.build_payload()
 
@@ -67,13 +67,13 @@ def main():
         )
 
     except ApiServiceError as error:
-        print(
-            f"Erreur API : {error}"
-        )
+        # print(
+        #     f"Erreur API : {error}"
+        # )
         return
 
-    print("API response:")
-    print(response)
+    # print("API response:")
+    # print(response)
 
 
 if __name__ == "__main__":

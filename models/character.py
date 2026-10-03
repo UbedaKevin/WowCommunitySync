@@ -1,6 +1,7 @@
 class Character:
     def __init__(self, character_key, data):
         self.key = character_key
+        self.id = data.get("id")
 
         # Identity
         self.name = data.get("name")
@@ -39,7 +40,8 @@ class Character:
     def to_dict(self):
         return {
             "key": self.key,
-
+            "id": self.id,
+            
             "name": self.name,
             "realm": self.realm,
 

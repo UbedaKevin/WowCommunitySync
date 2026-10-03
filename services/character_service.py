@@ -50,10 +50,10 @@ class CharacterService:
 
         payload = self.build_payload()
 
-        print(
-            json.dumps(
-                payload,
-                indent=4,
-                ensure_ascii=False
-            )
-        )
+        # print(
+        #     json.dumps(
+        #         payload,
+        #         indent=4,
+        #         ensure_ascii=False
+        #     )
+        # )

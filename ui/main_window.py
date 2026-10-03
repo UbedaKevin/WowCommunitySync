@@ -21,10 +21,11 @@ from wow_path import find_saved_variables
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, sync_service):
         super().__init__()
-
+        self.sync_service = sync_service
         self.characters = []
+        self.sync_events = []
 
         self.setWindowTitle(
             "WoW Community Sync"
@@ -149,6 +150,26 @@ class MainWindow(QMainWindow):
             self.scan
         )
 
+        # =====================================================
+        # Sync button
+        # =====================================================
+
+        sync_button = QPushButton(
+            "Sync"
+        )
+
+        sync_button.setObjectName(
+            "syncButton"
+        )
+
+        sync_button.clicked.connect(
+            self.sync
+        )
+        
+        # =====================================================
+        # File selector
+        # =====================================================
+        
         file_layout.addWidget(
             self.file_input
         )
@@ -159,6 +180,10 @@ class MainWindow(QMainWindow):
 
         file_layout.addWidget(
             scan_button
+        )
+
+        file_layout.addWidget(
+            sync_button
         )
 
         main_layout.addWidget(
@@ -489,6 +514,15 @@ class MainWindow(QMainWindow):
             QWidget#detailsContent {
                 background-color: #343B48;
             }
+
+            #syncButton {
+                background-color: #F0840D;
+                font-weight: bold;
+            }
+
+            #syncButton:hover {
+                background-color: #596579;
+            }
             """
         )
 
@@ -589,6 +623,14 @@ class MainWindow(QMainWindow):
                 character
             )
 
+        # for character in self.characters:
+        #     print(
+        #         "CHARACTER:",
+        #         character.name,
+        #         "EQUIPMENT:",
+        #         character.equipment
+        #     )
+
         self.display_characters()
 
         self.status_label.setText(
@@ -604,6 +646,169 @@ class MainWindow(QMainWindow):
 
             self.display_character_details(
                 self.characters[0]
+            )
+
+    # =====================================================
+    # Sync
+    # =====================================================
+    def sync(self):
+
+        try:
+
+            result = self.sync_service.sync()
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Sync error",
+                str(e)
+            )
+
+            return
+
+        # =================================================
+        # Associate PostgreSQL IDs with UI characters
+        # =================================================
+
+        synced_characters = result.get(
+            "characters",
+            []
+        )
+
+        for synced_character in synced_characters:
+
+            guid = synced_character.get(
+                "guid"
+            )
+
+            character_id = synced_character.get(
+                "id"
+            )
+
+            for character in self.characters:
+
+                if character.guid == guid:
+
+                    character.id = character_id
+
+                    break
+
+        # =================================================
+        # Sync statistics
+        # =================================================
+
+        created = result.get(
+            "createdCount",
+            0
+        )
+
+        updated = result.get(
+            "updatedCount",
+            0
+        )
+
+        unchanged = result.get(
+            "unchangedCount",
+            0
+        )
+
+        events = result.get(
+            "events",
+            []
+        )
+
+        self.sync_events = events
+
+        # =================================================
+        # Load historical events
+        # =================================================
+
+        current_row = self.characters_list.currentRow()
+
+        self.sync_events = []
+
+        try:
+            for character in self.characters:
+                if character.id is None:
+                    continue
+
+                event_result = (
+                    self.sync_service
+                    .get_character_events(
+                        character
+                    )
+                )
+
+                historical_events = event_result.get(
+                    "events",
+                    []
+                )
+
+                for event in historical_events:
+                    event["character_guid"] = (
+                        character.guid
+                    )
+
+                    event["character_name"] = (
+                        character.name
+                    )
+
+                self.sync_events.extend(
+                    historical_events
+                )
+
+        except Exception as e:
+
+            QMessageBox.warning(
+                self,
+                "Events error",
+                str(e)
+            )
+
+        # =================================================
+        # Refresh displayed character
+        # =================================================
+
+        if (
+            0 <= current_row < len(self.characters)
+        ):
+
+            self.display_character_details(
+                self.characters[current_row]
+            )
+
+        # =================================================
+        # Status
+        # =================================================
+
+        if events:
+
+            event_text = ", ".join(
+                event.get(
+                    "event_type",
+                    "UNKNOWN"
+                )
+                for event in events
+            )
+
+            self.status_label.setText(
+                "<span style='color:#F0840D;'>●</span>&nbsp;&nbsp;"
+                f"Sync completed — "
+                f"{created} created, "
+                f"{updated} updated, "
+                f"{unchanged} unchanged"
+                f" — Events: {event_text}"
+            )
+
+        else:
+
+            self.status_label.setText(
+                "<span style='color:#F0840D;'>●</span>&nbsp;&nbsp;"
+                f"Sync completed — "
+                f"{created} created, "
+                f"{updated} updated, "
+                f"{unchanged} unchanged"
             )
 
     # =========================================================
@@ -726,7 +931,7 @@ class MainWindow(QMainWindow):
             self.add_detail(
                 "No guild"
             )
-
+        
         # =====================================================
         # Professions
         # =====================================================
@@ -831,6 +1036,145 @@ class MainWindow(QMainWindow):
                 self.details_layout.addWidget(
                     label
                 )
+        # =====================================================
+        # Events
+        # =====================================================
+
+        self.add_section_title(
+            "Events"
+        )
+
+        character_events = [
+            event
+            for event in self.sync_events
+            if event.get("character_guid") == character.guid
+        ]
+
+        if not character_events:
+
+            self.add_detail(
+                "No recent events."
+            )
+
+        else:
+
+            for event in character_events:
+
+                event_type = event.get(
+                    "event_type",
+                    "UNKNOWN"
+                )
+
+                event_data = event.get(
+                    "event_data",
+                    {}
+                )
+
+                if event_type == "LEVEL_UP":
+
+                    old_level = event_data.get(
+                        "oldLevel",
+                        "?"
+                    )
+
+                    new_level = event_data.get(
+                        "newLevel",
+                        "?"
+                    )
+
+                    text = (
+                        f"Level up: "
+                        f"{old_level} → {new_level}"
+                    )
+
+                elif event_type == "GUILD_CHANGED":
+
+                    old_guild = event_data.get(
+                        "oldGuild"
+                    ) or "No guild"
+
+                    new_guild = event_data.get(
+                        "newGuild"
+                    ) or "No guild"
+
+                    text = (
+                        f"Guild changed: "
+                        f"{old_guild} → {new_guild}"
+                    )
+
+                elif event_type == "PROFESSION_LEARNED":
+
+                    profession_name = event_data.get(
+                        "profession",
+                        "Unknown profession"
+                    )
+
+                    text = (
+                        f"Profession learned: "
+                        f"{profession_name}"
+                    )
+
+                elif event_type == "RECIPE_LEARNED":
+
+                    recipe_name = event_data.get(
+                        "recipeName",
+                        "Unknown recipe"
+                    )
+
+                    text = (
+                        f"Recipe learned: "
+                        f"{recipe_name}"
+                    )
+
+                elif event_type == "EQUIPMENT_CHANGED":
+
+                    slot = event_data.get(
+                        "slot",
+                        "Unknown slot"
+                    )
+
+                    old_item = self.extract_item_name(
+                        event_data.get("oldItemLink")
+                    )
+
+                    new_item = self.extract_item_name(
+                        event_data.get("newItemLink")
+                    )
+
+                    text = (
+                        f"Equipment changed: "
+                        f"{slot} — "
+                        f"{old_item} → {new_item}"
+                    )
+
+                else:
+
+                    text = (
+                        f"{event_type} — "
+                        f"{event_data}"
+                    )
+
+                created_at = event.get(
+                    "created_at",
+                    ""
+                )
+
+                if created_at:
+
+                    formatted_date = (
+                        self.format_event_date(
+                            created_at
+                        )
+                    )
+
+                    text = (
+                        f"{text}  •  "
+                        f"{formatted_date}"
+                    )
+
+                self.add_detail(
+                    text
+                )
 
         self.details_layout.addStretch()
 
@@ -885,6 +1229,31 @@ class MainWindow(QMainWindow):
             if widget:
 
                 widget.deleteLater()
+    def format_event_date(
+        self,
+        created_at
+    ):
+
+        if not created_at:
+            return ""
+
+        try:
+            from datetime import datetime
+
+            date = datetime.fromisoformat(
+                created_at.replace(
+                    "Z",
+                    "+00:00"
+                )
+            )
+
+            return date.strftime(
+                "%d/%m/%Y %H:%M"
+            )
+
+        except ValueError:
+
+            return created_at
 
     def extract_item_name(
         self,
