@@ -11,6 +11,100 @@ class ApiService:
         self.base_url = base_url.rstrip("/")
         self.access_token = access_token
 
+    def set_access_token(self, access_token):
+        self.access_token = access_token
+
+    def login(self, email, password):
+        url = f"{self.base_url}/api/auth/login"
+
+        try:
+            response = requests.post(
+                url,
+                json={
+                    "email": email,
+                    "password": password,
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            status_code = error.response.status_code
+
+            try:
+                message = error.response.json().get(
+                    "message",
+                    "Erreur d'authentification."
+                )
+            except ValueError:
+                message = "Erreur d'authentification."
+
+            raise ApiServiceError(
+                f"L'API a retourné une erreur HTTP "
+                f"{status_code} : {message}"
+            ) from error
+
+        except requests.RequestException as error:
+            raise ApiServiceError(
+                f"Erreur réseau lors de la communication "
+                f"avec l'API : {error}"
+            ) from error
+
+        try:
+            return response.json()
+        except ValueError as error:
+            raise ApiServiceError(
+                "L'API a retourné une réponse JSON invalide."
+            ) from error
+
+    def get_current_user(self, access_token=None):
+        token = access_token or self.access_token
+
+        if not token:
+            raise ApiServiceError(
+                "Aucun token d'accès disponible."
+            )
+
+        url = f"{self.base_url}/api/auth/me"
+
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            status_code = error.response.status_code
+
+            try:
+                message = error.response.json().get(
+                    "message",
+                    "Erreur d'authentification."
+                )
+            except ValueError:
+                message = "Erreur d'authentification."
+
+            raise ApiServiceError(
+                f"L'API a retourné une erreur HTTP "
+                f"{status_code} : {message}"
+            ) from error
+
+        except requests.RequestException as error:
+            raise ApiServiceError(
+                f"Erreur réseau lors de la communication "
+                f"avec l'API : {error}"
+            ) from error
+
+        try:
+            return response.json()
+        except ValueError as error:
+            raise ApiServiceError(
+                "L'API a retourné une réponse JSON invalide."
+            ) from error
     def sync_characters(self, payload):
         url = f"{self.base_url}/api/characters/sync"
 

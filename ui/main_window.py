@@ -21,9 +21,11 @@ from wow_path import find_saved_variables
 
 class MainWindow(QMainWindow):
 
-    def __init__(self, sync_service):
+    def __init__(self, sync_service, auth_service, on_logout=None):
         super().__init__()
         self.sync_service = sync_service
+        self.auth_service = auth_service
+        self.on_logout = on_logout
         self.characters = []
         self.sync_events = []
 
@@ -90,7 +92,21 @@ class MainWindow(QMainWindow):
         )
 
         header_layout.addStretch()
+        self.logout_button = QPushButton(
+            "Se déconnecter"
+        )
 
+        self.logout_button.clicked.connect(
+            self.handle_logout
+        )
+
+        header_layout.addWidget(
+            self.logout_button
+        )
+
+        header_layout.addSpacing(
+            10
+        )
         self.status_label = QLabel(
             "Ready"
         )
@@ -1181,6 +1197,25 @@ class MainWindow(QMainWindow):
     # =========================================================
     # Helpers
     # =========================================================
+    def handle_logout(self):
+
+        try:
+            self.auth_service.logout()
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Déconnexion",
+                str(error)
+            )
+
+            return
+
+        self.close()
+
+        if self.on_logout:
+            self.on_logout()
 
     def add_section_title(
         self,
